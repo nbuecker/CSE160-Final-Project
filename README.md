@@ -1,1 +1,3 @@
 # CSE160-Final-Project
+# is there a way you can give me editing privaleges? It says you have to approve them first. Well, maybe that's a good thing
+# if you want to always check my work before you add it in...
