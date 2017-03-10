@@ -2,13 +2,18 @@ import numpy as np
 import pandas as pd
 import csv
 import os
-import matplotlib.pyplot as plt
+import matplotlib as plt
+#import statsmodels.formula.api as sm
+
+################################################################################
+#Part 0: Import the Data
+################################################################################
+
 
 regions = ['Central Europe and the Baltics', 'East Asia & Pacific (excluding high income)', 'East Asia & Pacific', 'Europe & Central Asia (excluding high income)', 'Europe & Central Asia', 'Euro area', 'European Union', 'Latin America & Caribbean (excluding high income)', 'Latin America & Caribbean', 'Middle East & North Africa (excluding high income)', 'North America', 'South Asia', 'Sub-Saharan Africa (excluding high income)', 'Sub-Saharan Africa', 'East Asia & Pacific (IDA & IBRD countries)', 'Europe & Central Asia (IDA & IBRD countries)', 'Latin America & the Caribbean (IDA & IBRD countries)', 'Middle East & North Africa (IDA & IBRD countries)', 'South Asia (IDA & IBRD)', 'Sub-Saharan Africa (IDA & IBRD countries)', 'Arab World']
 classes = ['Early-demographic dividend', 'Fragile and conflict affected situations', 'High income', 'Heavily indebted poor countries (HIPC)', 'Least developed countries: UN classification', 'Low income', 'Lower middle income', 'Low & middle income', 'Late-demographic dividend', 'Pre-demographic dividend', 'Post-demographic dividend', 'Upper middle income', 'IBRD only', 'IDA & IBRD total', 'IDA total', 'IDA blend', 'IDA only']
-others = ['Not classified', 'OECD members', 'Other small states', 'Small states', 'World']
-
-       
+others = ['Not classified', 'OECD members', 'Other small states', 'Small states']
+      
 def create_df(filename):
     """Reads in CSV file and returns a pandas DataFrame with years as the index
     column and country names as the rest of the columns, and the land percentage
@@ -45,10 +50,38 @@ def create_df(filename):
     df['Years'] = years
 
     df = df.set_index('Years')
-
-    
     return df
+  
+################################################################################
+#Part 1: Format and Create DataFrames
+################################################################################
+
+def pivot_data_frame_row_to_df_column(year, column_names, source_list):
+    """Selects a row from each of the source data frames and augments a new 
+        dataframe with those rows as its columns.
     
+    Parameters: year (the row of the source dataframe); column_names (a list of 
+    names that will correspond to the name of the pivoted row in the target 
+    dataframe; source_list (a list of the data frames from which you select the 
+    rows).
+    
+    Returns: Returns and augmented data frame
+    
+    Cautions: If the source_list and column_names lists are not the same 
+    length it will print an error and return 0. The column names and source 
+    dataframes MUST BE COMPATIBALY INDEXED, otherwise the data will be assigned
+    an improper name."""
+    
+    if len(column_names) != len(source_list):
+        print "Column names and source dataframes lists are of incompatible"+ \
+                "length."   
+    else:
+        target_df = pd.DataFrame() 
+        for index in range(len(source_list)):
+            target_df[column_names[index]] = source_list[index].loc[year]
+    return target_df
+
+
 def econ_class_dummy_var_df(metadata_file):
     """Takes metadata file listing countries to their respective income group,
     designated as High Income (proxy for economic class level "Developed"), 
@@ -93,6 +126,28 @@ def econ_class_dummy_var_df(metadata_file):
     return df
 
 
+def finalize_data_frames(dataframes, dummy_df):
+    """Add dummy variable columns to any DataFrame in dataframes and removes 
+        countries for which there is not complete data.
+        
+        Parameters: dataframes (a list of DataFrames that will be finalized)
+                    dummy_df (a DataFrame comprised of appropriately indexed 
+                        countries based on their GDP/N bracket
+        Returns: None. It merely adds D.V. columns to pre-exosting DataFrames
+        Cautions: If no DataFrames are passed in, the function will reuturn None
+                    and print an error message."""
+    
+    for dataframe in dataframes:
+        dataframe["Devlpng"] = dummy_df["Developing"]
+        dataframe["Underdev"] = dummy_df["Under-Developed"]
+     
+            
+    
+  
+################################################################################
+#Part 1: Show how land use has changed#
+################################################################################
+
 def plot_df(df, y_label='', sliced=False, years=None, country=None):
     """Takes a DataFrame and plots each Country Name against each year, if
     nothing is passed for sliced and years. If sliced=True and years is given
@@ -123,19 +178,54 @@ def plot_df(df, y_label='', sliced=False, years=None, country=None):
     df_year.plot(kind='area', rot='vertical', legend=False, ax=ax) #or: xticks=df_year[labels],
     
     plt.tight_layout()
+    plt.show()    
+    
+################################################################################
+#Part X: Main Function
+################################################################################
+
+def main():
+    
+    #input files to be used
+    agro_input = raw_input("Enter Agriculture File:")
+    forest_input = raw_input("Enter Forestlands File:")
+    gdp_input = raw_input("Enter GDP per Capita File:")
+    meta_input = raw_input("Enter Metadata File:") 
+    
+    # create DataFrames
+    agro_df = create_df(agro_input)
+    forest_df = create_df(forest_input)
+    gdp_df = create_df(gdp_input)
+    other_df = 100 - agro_df - forest_df
+    
+    #create Dummy Variable DataFrame
+    dv_df = econ_class_dummy_var_df(meta_input)
+    
+    #create master DataFrames
+    country_attributes = ["% Agro", "% Forest", "% Other", "GDP_N"]
+    source_dfs = [agro_df, forest_df, other_df, gdp_df ]
+    
+    master_90 = pivot_data_frame_row_to_df_column(1990, country_attributes, source_dfs)
+    master_02 = pivot_data_frame_row_to_df_column(2002, country_attributes, source_dfs)
+    master_14 = pivot_data_frame_row_to_df_column(2014, country_attributes, source_dfs)
+    
+    #add D.V. columns
+    data_f_list = [master_90, master_02, master_14]
+    finalize_data_frames(data_f_list, dv_df) 
+    
+    print master_14.describe()
+    master_14.plot.scatter(x = '% Agro', y = 'GDP_N')
     plt.show()
+ 
+    
+    #plot magnitueds of differnce in land use
+    #plot_df(agro_df, y_label='Agriculture', sliced=True, years=1990)
+    #plot_df(forest_df, y_label='Forest', sliced=True, years=1990)
+    #plot_df(other_df, y_label='Other', sliced=True, years=1990)
+    
+    
+            
+if __name__ == "__main__":
+    main()
 
 
-#def main():
-#    
-#    agro_input = create_df('Actual_Data/gdp_data/gdp_data.csv')
-#    gdp_input = raw_input('Enter GDP Data:')
-#        
-#    print agro_input)
-#    gdp_df = create_df(gdp_input)
-#    #plot_df(agro_df, y_label='Agriculture', sliced=True, years=1990)
-#
-#    #plot_df(gdp_df, y_label='GDP', sliced=True, years=1990)
-#    
-#if __name__ == '__main__':
-#    main()
